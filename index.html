@@ -215,27 +215,19 @@
         border-radius: 6px;
     }
     
-    /* 1. Einzelblock = Sandbraun (#f4a460) */
     .block-badge.block-1 {
         background: #f4a460; color: #0f172a; border: 1px solid #e08e45;
     }
-
-    /* Doppel-Block = Grau / Anthrazit */
     .block-badge.block-doppel {
         background: #334155; color: #cbd5e1; border: 1px solid #64748b;
     }
-
-    /* 2. Einzelblock = Hellgelb (#ffec8b) */
     .block-badge.block-2 {
         background: #ffec8b; color: #0f172a; border: 1px solid #e6d370;
     }
-
-    /* Fallback */
     .block-badge.block-default {
         background: #0f172a; color: #f59e0b; border: 1px solid #f59e0b;
     }
     
-    /* Match Row Styling */
     .match-row {
         display: flex; align-items: center; justify-content: space-between;
         padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer;
@@ -291,7 +283,6 @@
         <div class="app-main-header">
             <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">🔄 Daten aktualisieren</button>
             
-            <!-- Zeile für Logo links, Titel und Logo rechts nebeneinander -->
             <div class="header-title-row">
                 <img src="https://lh3.googleusercontent.com/d/1PB4X2QrrMlaRlajQEWDtJxRP2c6VTsI5" alt="TV Kapellen Logo" class="header-logo">
                 <h1>TV Kapellen 1919 e.V. 2</h1>
@@ -315,7 +306,7 @@
             <div class="premium-card">
                 <div class="card-header-title">
                     <h2>🏆 HIGHLIGHTS & BILANZ</h2>
-                    <div class="subtitle">SIEGE, NIEDERLAGEN & BESTLEISTUNGEN</div>
+                    <div class="subtitle">SIEGE, NIEDERLAGEN & BESTLEISTUNGEN (NUR EINZEL)</div>
                 </div>
                 <table class="data-table">
                     <thead>
@@ -337,7 +328,7 @@
             <div class="premium-card">
                 <div class="card-header-title">
                     <h2>🎯 SCORING-STATS</h2>
-                    <div class="subtitle">GESAMTANZAHL ALLER HIGH-SCORES</div>
+                    <div class="subtitle">GESAMTANZAHL ALLER HIGH-SCORES (NUR EINZEL)</div>
                 </div>
                 <table class="data-table">
                     <thead>
@@ -506,6 +497,20 @@
 
             if (!spieltagNum) return;
 
+            // --- DOPPEL-ERKENNUNG DIREKT AM ANFANG ---
+            let isDoppelMatch = blockName.toLowerCase().includes("doppel") || spielerKapellen.includes("/");
+
+            if (!spieltageMap[spieltagNum]) {
+                spieltageMap[spieltagNum] = {
+                    nummer: spieltagNum, datum: datum, gegnerTeam: gegnerTeam,
+                    endergebnis: endergebnis, bloecke: {}, alleSpieler: new Set()
+                };
+            }
+
+            let st = spieltageMap[spieltagNum];
+            if (endergebnis && !st.endergebnis) st.endergebnis = endergebnis;
+            if (!st.bloecke[blockName]) st.bloecke[blockName] = [];
+
             let autoShortLegs = 0;
             let dartLegsArray = [];
             let currentMatchShortLegs = [];
@@ -535,17 +540,6 @@
                 }
             }
 
-            if (!spieltageMap[spieltagNum]) {
-                spieltageMap[spieltagNum] = {
-                    nummer: spieltagNum, datum: datum, gegnerTeam: gegnerTeam,
-                    endergebnis: endergebnis, bloecke: {}, alleSpieler: new Set()
-                };
-            }
-
-            let st = spieltageMap[spieltagNum];
-            if (endergebnis && !st.endergebnis) st.endergebnis = endergebnis;
-            if (!st.bloecke[blockName]) st.bloecke[blockName] = [];
-
             let matchObj = {
                 id: idx,
                 spieler: spielerKapellen, gegner: gegnerName, ergebnis: ergebnisSpiel,
@@ -553,18 +547,28 @@
                 sgCount: autoShortLegs, achtzigerCount: match180Count, 
                 achtzigerRaw: hunderteachtzigerRaw,
                 hfString: hfString,
-                scoring: {
-                    s60: score60,
-                    s80: score80,
-                    s100: score100,
-                    s140: score140,
-                    s180: match180Count
-                }
+                scoring: { s60: score60, s80: score80, s100: score100, s140: score140, s180: match180Count }
             };
 
             st.bloecke[blockName].push(matchObj);
 
-            // Siege & Niederlagen ermitteln aus ergebnisSpiel (z.B. "3:1" -> Sieg)
+            // Beteiligte Spieler registrieren
+            let beteiligteSpieler = spielerKapellen.split("/").map(s => s.trim()).filter(s => s !== "");
+            beteiligteSpieler.forEach(subP => {
+                let matchedKaderName = teamKader.find(tk => tk.toLowerCase() === subP.toLowerCase());
+                if (matchedKaderName) {
+                    st.alleSpieler.add(matchedKaderName.toLowerCase());
+                } else if (subP) {
+                    st.alleSpieler.add(subP.toLowerCase());
+                }
+            });
+
+            // WICHTIG: Wenn es ein Doppel ist, hier komplett abbrechen (keine Einzel-Statistiken)
+            if (isDoppelMatch) {
+                return; 
+            }
+
+            // --- AB HIER NUR REINE EINZEL-BERECHNUNG ---
             let isWin = false;
             let isLoss = false;
             if (ergebnisSpiel && ergebnisSpiel.includes(":")) {
@@ -575,11 +579,7 @@
                 else if (p2 > p1) isLoss = true;
             }
 
-            let beteiligteSpieler = spielerKapellen.split("/").map(s => s.trim()).filter(s => s !== "");
-            
             beteiligteSpieler.forEach(subP => {
-                if(subP) st.alleSpieler.add(subP.toLowerCase());
-                
                 let matchedKaderName = teamKader.find(tk => tk.toLowerCase() === subP.toLowerCase());
                 if (matchedKaderName) {
                     if (isWin) spielerStats[matchedKaderName].siege++;
@@ -593,6 +593,8 @@
                     spielerStats[matchedKaderName].s80 += score80;
                     spielerStats[matchedKaderName].s100 += score100;
                     
+                    spielerStats[matchedKaderName].hunderteachtziger += match180Count;
+
                     if (hfString) {
                         hfString.split(",").forEach(f => {
                             let fNum = parseInt(f.trim());
@@ -600,23 +602,6 @@
                                 spielerStats[matchedKaderName].topFinish = fNum;
                             }
                         });
-                    }
-
-                    if (hunderteachtzigerRaw) {
-                        let rawLower = hunderteachtzigerRaw.toLowerCase();
-                        let playerLastName = matchedKaderName.split(" ").pop().toLowerCase();
-
-                        if (beteiligteSpieler.length > 1) {
-                            if (rawLower.includes(playerLastName)) {
-                                let numMatch = hunderteachtzigerRaw.match(new RegExp(playerLastName + "\\s*(\\d+)", "i"));
-                                let countToAdd = numMatch ? parseInt(numMatch[1]) : 1;
-                                spielerStats[matchedKaderName].hunderteachtziger += countToAdd;
-                            } else if (!isNaN(parseInt(hunderteachtzigerRaw)) && !rawLower.match(/[a-z]/i)) {
-                                spielerStats[matchedKaderName].hunderteachtziger += parseInt(hunderteachtzigerRaw);
-                            }
-                        } else {
-                            spielerStats[matchedKaderName].hunderteachtziger += match180Count;
-                        }
                     }
                 }
             });
@@ -813,16 +798,39 @@
         let isDoppel = m.spieler.includes("/");
 
         let display180 = "—";
-        if (isDoppel) {
-            if (m.achtzigerRaw && m.achtzigerRaw.trim() !== "") {
-                display180 = m.achtzigerRaw; 
-            } else if (m.achtzigerCount > 0) {
-                display180 = m.achtzigerCount + "x";
-            }
-        } else {
-            if (m.achtzigerCount > 0) {
-                display180 = m.achtzigerCount + "x";
-            }
+        if (m.achtzigerCount > 0) {
+            display180 = m.achtzigerCount + "x";
+        } else if (m.achtzigerRaw && m.achtzigerRaw.trim() !== "") {
+            display180 = m.achtzigerRaw; 
+        }
+
+        let scoringSection = "";
+        if (!isDoppel) {
+            scoringSection = `
+                <div class="modal-section-title">Scoring</div>
+                <table class="modal-table">
+                    <thead>
+                        <tr class="scoring-header-row">
+                            <th style="text-align:left; width: 35%;"></th>
+                            <th>60+</th>
+                            <th>80+</th>
+                            <th>100+</th>
+                            <th>140+</th>
+                            <th>180</th>
+                        </tr>
+                    </thead>
+                    <tbody class="scoring-table-body">
+                        <tr>
+                            <td class="p-name">${m.spieler}</td>
+                            <td>${m.scoring ? m.scoring.s60 : '0'}</td>
+                            <td>${m.scoring ? m.scoring.s80 : '0'}</td>
+                            <td>${m.scoring ? m.scoring.s100 : '0'}</td>
+                            <td>${m.scoring ? m.scoring.s140 : '0'}</td>
+                            <td>${m.scoring ? m.scoring.s180 : '0'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
         }
 
         document.getElementById("modalBody").innerHTML = `
@@ -832,7 +840,7 @@
             
             <div class="modal-section-title">Averages</div>
             <table class="modal-table">
-                <thead><tr><th>Spieler</th><th>3-Dart Avg</th></tr></thead>
+                <thead><tr><th>Spieler / Paar</th><th>3-Dart Avg</th></tr></thead>
                 <tbody>
                     <tr><td class="p-name">${m.spieler}</td><td style="color:#f59e0b; font-weight:bold;">${m.avg || '—'}</td></tr>
                 </tbody>
@@ -844,31 +852,9 @@
                 <tbody>${legsHtml}</tbody>
             </table>
 
-            <div class="modal-section-title">Scoring</div>
-            <table class="modal-table">
-                <thead>
-                    <tr class="scoring-header-row">
-                        <th style="text-align:left; width: 35%;"></th>
-                        <th>60+</th>
-                        <th>80+</th>
-                        <th>100+</th>
-                        <th>140+</th>
-                        <th>180</th>
-                    </tr>
-                </thead>
-                <tbody class="scoring-table-body">
-                    <tr>
-                        <td class="p-name">${m.spieler}</td>
-                        <td>${m.scoring ? m.scoring.s60 : '0'}</td>
-                        <td>${m.scoring ? m.scoring.s80 : '0'}</td>
-                        <td>${m.scoring ? m.scoring.s100 : '0'}</td>
-                        <td>${m.scoring ? m.scoring.s140 : '0'}</td>
-                        <td>${m.scoring ? m.scoring.s180 : '0'}</td>
-                    </tr>
-                </tbody>
-            </table>
+            ${scoringSection}
 
-            <div class="modal-section-title">Highlights Match</div>
+            <div class="modal-section-title">${isDoppel ? 'Highlights Doppel-Match' : 'Highlights Match'}</div>
             <div style="font-size:13px; background:#0f172a; padding:10px; border-radius:6px; border: 1px solid #334155;">
                 🎯 <b>180er:</b> ${display180}<br>
                 🔥 <b>High Finish:</b> ${m.hfString || '—'}<br>
