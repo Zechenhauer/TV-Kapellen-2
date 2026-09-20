@@ -667,6 +667,14 @@
                         <img src="https://lhusylpjnujlqomougmg.supabase.co/storage/v1/object/public/Bilder/2.te%20und%203te.png" alt="2. und 3. Mannschaft TV Kapellen" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #334155;">
                     </div>`;
             }
+
+            // 👉 Bild ganz unten in der Spieltag-Karte eingefügt
+            if (st.nummer === 2) {
+                cardHtml += `
+                    <div style="padding: 15px; text-align: center; background: #162032; border-top: 1px solid #334155;">
+                        <img src="https://lhusylpjnujlqomougmg.supabase.co/storage/v1/object/public/Bilder/2te_zweites_spiel.png" alt="2. und 3. Mannschaft TV Kapellen" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #334155;">
+                    </div>`;
+            }
             
             cardHtml += `</div>`;
             container.innerHTML += cardHtml;
